@@ -1,0 +1,64 @@
+2025-03-23 13:33:02,880 - INFO - Serveur en écoute sur 127.0.0.1:54424
+2025-03-23 13:33:32,968 - INFO - Serveur en écoute sur 127.0.0.1:54424
+2025-03-23 13:39:57,903 - INFO - Utilisateur ADMIN authentifié avec succès depuis 127.0.0.1.
+2025-03-23 13:40:08,993 - ERROR - Erreur lors du déchiffrement du message de ADMIN (127.0.0.1): 
+2025-03-23 13:40:08,993 - INFO - Client ADMIN déconnecté.
+2025-03-23 13:40:21,552 - INFO - Utilisateur user authentifié avec succès depuis 127.0.0.1.
+2025-03-23 13:40:26,392 - ERROR - Erreur lors du déchiffrement du message de user (127.0.0.1): 
+2025-03-23 13:40:26,392 - INFO - Client user déconnecté.
+2025-03-23 13:40:28,966 - ERROR - Unhandled exception in client_connected_cb
+transport: <asyncio.sslproto._SSLProtocolTransport object at 0x0000022BA14C5910>
+Traceback (most recent call last):
+  File "C:\Users\areon\Documents\Perso\cyber\Messagerie safe\github\HaycomChat\serveur.py", line 283, in handle_client_wrapper
+    await handle_client(reader, writer, username, ip_address)
+  File "C:\Users\areon\Documents\Perso\cyber\Messagerie safe\github\HaycomChat\serveur.py", line 230, in handle_client
+    await writer.wait_closed()
+  File "c:\Program Files\Python313\Lib\asyncio\streams.py", line 358, in wait_closed
+    await self._protocol._get_close_waiter(self)
+  File "c:\Program Files\Python313\Lib\asyncio\sslproto.py", line 648, in _do_shutdown
+    self._sslobj.unwrap()
+    ~~~~~~~~~~~~~~~~~~~^^
+  File "c:\Program Files\Python313\Lib\ssl.py", line 955, in unwrap
+    return self._sslobj.shutdown()
+           ~~~~~~~~~~~~~~~~~~~~~^^
+ssl.SSLError: [SSL: APPLICATION_DATA_AFTER_CLOSE_NOTIFY] application data after close notify (_ssl.c:2706)
+2025-03-23 13:40:33,619 - ERROR - Unhandled exception in client_connected_cb
+transport: <asyncio.sslproto._SSLProtocolTransport object at 0x0000022BA14C5A90>
+Traceback (most recent call last):
+  File "C:\Users\areon\Documents\Perso\cyber\Messagerie safe\github\HaycomChat\serveur.py", line 283, in handle_client_wrapper
+    await handle_client(reader, writer, username, ip_address)
+  File "C:\Users\areon\Documents\Perso\cyber\Messagerie safe\github\HaycomChat\serveur.py", line 230, in handle_client
+    await writer.wait_closed()
+  File "c:\Program Files\Python313\Lib\asyncio\streams.py", line 358, in wait_closed
+    await self._protocol._get_close_waiter(self)
+  File "c:\Program Files\Python313\Lib\asyncio\sslproto.py", line 648, in _do_shutdown
+    self._sslobj.unwrap()
+    ~~~~~~~~~~~~~~~~~~~^^
+  File "c:\Program Files\Python313\Lib\ssl.py", line 955, in unwrap
+    return self._sslobj.shutdown()
+           ~~~~~~~~~~~~~~~~~~~~~^^
+ssl.SSLError: [SSL: APPLICATION_DATA_AFTER_CLOSE_NOTIFY] application data after close notify (_ssl.c:2706)
+2025-03-23 13:41:56,446 - INFO - Serveur en écoute sur 127.0.0.1:54424
+2025-03-23 13:59:23,772 - INFO - Serveur en écoute sur 127.0.0.1:54424
+2025-03-23 13:59:36,116 - INFO - Utilisateur ADMIN authentifié avec succès depuis 127.0.0.1.
+2025-03-23 13:59:48,687 - INFO - Utilisateur user authentifié avec succès depuis 127.0.0.1.
+2025-03-23 13:59:53,422 - ERROR - Erreur lors du déchiffrement du message de ADMIN (127.0.0.1): 
+2025-03-23 13:59:53,422 - INFO - Client ADMIN déconnecté.
+2025-03-23 13:59:56,219 - ERROR - Erreur lors du déchiffrement du message de user (127.0.0.1): 
+2025-03-23 13:59:56,219 - INFO - Client user déconnecté.
+2025-03-23 13:59:57,526 - ERROR - Erreur lors de la fermeture de la connexion de user: [SSL: APPLICATION_DATA_AFTER_CLOSE_NOTIFY] application data after close notify (_ssl.c:2706)
+2025-03-23 13:59:59,247 - ERROR - Erreur lors de la fermeture de la connexion de ADMIN: [SSL: APPLICATION_DATA_AFTER_CLOSE_NOTIFY] application data after close notify (_ssl.c:2706)
+2025-03-23 14:12:31,876 - INFO - Serveur en écoute sur 127.0.0.1:54424
+2025-03-23 14:12:52,954 - INFO - Utilisateur ADMIN authentifié avec succès depuis 127.0.0.1.
+2025-03-23 14:13:06,896 - INFO - Utilisateur user authentifié avec succès depuis 127.0.0.1.
+2025-03-23 14:14:31,309 - WARNING - Connexion réinitialisée par user (127.0.0.1).
+2025-03-23 14:14:31,310 - INFO - Client user déconnecté.
+2025-03-23 14:14:31,310 - ERROR - Erreur lors de la fermeture de la connexion de user: [WinError 64] Le nom réseau spécifié n’est plus disponible
+2025-03-23 14:14:40,752 - WARNING - Connexion réinitialisée par ADMIN (127.0.0.1).
+2025-03-23 14:14:40,753 - INFO - Client ADMIN déconnecté.
+2025-03-23 14:14:40,753 - ERROR - Erreur lors de la fermeture de la connexion de ADMIN: [WinError 64] Le nom réseau spécifié n’est plus disponible
+2025-03-23 14:24:25,259 - INFO - Serveur en écoute sur 127.0.0.1:54424
+2025-03-23 14:30:27,673 - INFO - Utilisateur ADMIN authentifié avec succès depuis 127.0.0.1.
+2025-03-23 14:32:23,409 - INFO - Utilisateur user authentifié avec succès depuis 127.0.0.1.
+2025-03-23 14:32:48,199 - INFO - Client user déconnecté.
+2025-03-23 14:40:27,551 - INFO - Client ADMIN déconnecté.

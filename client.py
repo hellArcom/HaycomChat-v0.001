@@ -5,11 +5,12 @@ import getpass
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 from Crypto.Protocol.KDF import scrypt
-from Crypto.Util.Padding import pad, unpad  # Ajouté pour la gestion propre du padding
+from Crypto.Util.Padding import pad, unpad
 import base64
 
 HOST = '127.0.0.1'
 PORT = 54424
+
 
 # Création du contexte SSL
 context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile="server.crt")
@@ -46,51 +47,80 @@ def aes_decrypt(texte_chiffre, cle_utilisateur):
 
     return decrypted_text.decode()
 
-def receive_messages(client_socket, cle_utilisateur):
+def receive_messages(client_socket, cle_session):
     while True:
         try:
             encrypted_message = client_socket.recv(1024).decode()
             if encrypted_message:
-                decrypted_message = aes_decrypt(encrypted_message, cle_utilisateur)
-                print(f"\n📥 Message reçu : {decrypted_message}\n> ", end="")
+                try:
+                    decrypted_message = aes_decrypt(encrypted_message, cle_session)
+                    print(f"\n📥 Message reçu : {decrypted_message}\n> ", end="")  # Affichage du message
+                except (ValueError, KeyError):
+                    # Si le déchiffrement échoue, on ignore le message
+                    print("\n⚠️ Impossible de déchiffrer un message reçu. Ignoré.\n> ", end="")  # Gestion des erreurs de déchiffrement
         except:
             print("❌ Connexion au serveur perdue.")
             break
 
-# Connexion au serveur
-with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
-    client.connect((HOST, PORT))
-    secure_client = context.wrap_socket(client, server_hostname=HOST)
+# Connexion au serveur avec gestion de la connexion SSL
+secure_client = None  # Initialisation en dehors de la boucle
 
-    print(secure_client.recv(1024).decode(), end="")
-    nom_user = input()
-    secure_client.send(nom_user.encode())
+try:
+    # Connexion au serveur sans SSL d'abord
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
+        client.connect((HOST, PORT))
+        print("🔐 Connexion au serveur en cours...")
+        
+        # Application de SSL à la connexion
+        secure_client = context.wrap_socket(client, server_hostname=HOST)
 
-    print(secure_client.recv(1024).decode(), end="")
-    mdp = getpass.getpass()
-    secure_client.send(mdp.encode())
+        # Si la connexion est établie, procéder à l'authentification
+        print(secure_client.recv(1024).decode(), end="")
+        nom_user = input()
+        secure_client.send(nom_user.encode())
 
-    auth_response = secure_client.recv(1024).decode()
-    if auth_response == "AUTH_FAIL":
-        print("❌ Authentification échouée !")
-        secure_client.close()
-        exit()
+        print(secure_client.recv(1024).decode(), end="")
+        mdp = getpass.getpass()
+        secure_client.send(mdp.encode())
 
-    print("✅ Authentification réussie ! Vous pouvez maintenant discuter.")
+        auth_response = secure_client.recv(1024).decode()
+        if auth_response == "AUTH_FAIL":
+            print("❌ Authentification échouée !")
+            secure_client.close()
+            exit()
 
-    # Demande de clé de chiffrement à l'utilisateur
-    cle_utilisateur = getpass.getpass("🔑 Entrez votre clé de chiffrement : ")
+        print("✅ Authentification réussie ! Vous pouvez maintenant discuter.")
 
-    threading.Thread(target=receive_messages, args=(secure_client, cle_utilisateur), daemon=True).start()
+        # Demande de clé de chiffrement à l'utilisateur
+        cle_utilisateur = getpass.getpass("🔑 Entrez votre clé de chiffrement : ")
 
-    while True:
-        message = input("> ")
-        if message.lower() == "exit":
-            break
-        message = nom_user + " : " + message
-        encrypted_message = aes_encrypt(message, cle_utilisateur)
-        secure_client.sendall(encrypted_message.encode())
+        threading.Thread(target=receive_messages, args=(secure_client, cle_utilisateur), daemon=True).start()
 
-    print("❌ Déconnexion...")
-    secure_client.close()
-    exit()
+        while True:
+            message = input("> ")
+            if message.lower() == "exit":
+                break
+            if secure_client.fileno() == -1: # Vérification de la connexion
+                print("Connexion perdue.")
+                break
+            message = nom_user + " : " + message
+            try:
+                encrypted_message = aes_encrypt(message, cle_utilisateur)
+                secure_client.send(encrypted_message.encode())
+            except (ConnectionResetError, ssl.SSLError, ConnectionRefusedError) as e:
+                print(f"Erreur de connexion: {e}")
+                break
+            except (ConnectionRefusedError, ssl.SSLError) as e:
+                print(f"❌ Erreur de connexion SSL: {e}")
+            except Exception as e:
+                print(f"Erreur lors de l'envoi du message: {e}")
+
+except:
+    print("❌ Une erreur est survenue.")
+
+
+
+print("❌ Connexion au serveur perdue.")
+secure_client.close()
+input("Appuyez sur Entrée pour quitter...")
+exit()
