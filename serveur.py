@@ -97,6 +97,8 @@ async def authenticate(reader, writer, ip_address):
 
         if verify_user(username, password):
             logging.info(f"Connexion réussie : {username} ({ip_address})")
+            writer.write(b"AUTH_SUCCESS") # Explicit success message
+            await writer.drain()
             return username
 
         logging.warning(f"Échec de connexion : {username} ({ip_address})")
@@ -124,6 +126,8 @@ async def handle_client(reader, writer, username, ip_address):
             message = await reader.read(MAX_MESSAGE_SIZE)
             if not message:
                 break
+            if message == b"EXIT":
+                break
 
             # Protection contre le flood
             current_time = time.time()
@@ -143,13 +147,24 @@ async def handle_client(reader, writer, username, ip_address):
                         logging.error(f"Erreur d'envoi à {user}: {e}")
 
     except asyncio.CancelledError:
+        pass  # Already handled
+    except ConnectionResetError:
+        logging.warning(f"Connexion interrompue par {username} ({ip_address})")
+    except asyncio.TimeoutError:
+        # Client hasn't sent anything in a while, assume disconnect
+        logging.warning(f"Client {username} ({ip_address}) timed out.")
+    except asyncio.CancelledError:
         pass
+    except OSError as e:
+        logging.error(f"Erreur (OSError) pour {username}: {e} (un client s'est déconnecté brutalement en fermant le terminal ?)")
+    except Exception as e:
+        logging.error(f"Erreur dans handle_client pour {username}: {e}")
     finally:
         logging.info(f"Déconnexion de {username}")
         del clients[username]
-        writer.close()
+        if not writer.is_closing():
+            writer.close()
         await writer.wait_closed()
-
 
 async def handle_client_wrapper(reader, writer):
     """Gère la connexion, applique les limites et démarre la session client."""
@@ -198,7 +213,6 @@ async def main():
     server = await asyncio.start_server(handle_client_wrapper, HOST, PORT, ssl=context)
     logging.info(f"Serveur en écoute sur {HOST}:{PORT}")
     await server.serve_forever()
-
 
 if __name__ == "__main__":
     asyncio.run(main())
