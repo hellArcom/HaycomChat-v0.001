@@ -32,7 +32,6 @@ IP_LOCKOUT_UNTIL = defaultdict(float)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-
 # --- Gestion des utilisateurs ---
 def load_user(username, filename="users.json"):
     """Charge un utilisateur depuis un fichier JSON."""
@@ -44,7 +43,6 @@ def load_user(username, filename="users.json"):
         except json.JSONDecodeError:
             logging.error(f"Erreur de lecture du fichier {filename}")
     return None
-
 
 def add_user(username, password, filename="users.json"):
     """Ajoute un nouvel utilisateur avec hashage sécurisé."""
@@ -63,7 +61,6 @@ def add_user(username, password, filename="users.json"):
 
     logging.info(f"Utilisateur {username} ajouté avec succès.")
 
-
 def verify_user(username, password, filename="users.json"):
     """Vérifie les identifiants de l'utilisateur."""
     user_data = load_user(username, filename)
@@ -73,7 +70,6 @@ def verify_user(username, password, filename="users.json"):
         received_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
         return hmac.compare_digest(stored_hash, received_hash)
     return False
-
 
 # --- Authentification ---
 async def authenticate(reader, writer, ip_address):
@@ -116,7 +112,6 @@ async def authenticate(reader, writer, ip_address):
     await writer.drain()
     return None
 
-
 # --- Gestion des clients ---
 async def handle_client(reader, writer, username, ip_address):
     """Gère la communication avec un client connecté."""
@@ -156,7 +151,7 @@ async def handle_client(reader, writer, username, ip_address):
     except asyncio.CancelledError:
         pass
     except OSError as e:
-        logging.error(f"Erreur (OSError) pour {username}: {e} (un client s'est déconnecté brutalement en fermant le terminal ?)")
+        logging.error(f"Erreur (OSError) pour {username}: {e} (un client s'est déconnecté brutalement en fermant le terminal (le plus probable) ?)")
     except Exception as e:
         logging.error(f"Erreur dans handle_client pour {username}: {e}")
     finally:
@@ -201,7 +196,6 @@ async def handle_client_wrapper(reader, writer):
     username = await authenticate(reader, writer, ip_address)
     if username:
         await handle_client(reader, writer, username, ip_address)
-
 
 async def main():
     """Démarre le serveur sécurisé."""
