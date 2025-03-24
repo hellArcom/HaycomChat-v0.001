@@ -100,7 +100,7 @@ def verify_user(username, password, json_filename="users.json"):
                 return "USERNAME_EXISTS" #Nom d'utilisateur déjà existant
             else:
                 add_user_to_json(new_username, password)
-                return "USER_CREATED"
+                return "USER_CREATED" #remplacer par failled_auth
         else:
             return "INVALID_USERNAME" #Nom d'utilisateur invalide
     else:
