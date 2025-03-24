@@ -33,7 +33,7 @@ IP_LOCKOUT_UNTIL = defaultdict(float)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # --- Gestion des utilisateurs ---
-def load_user(username, filename="users.json"):
+def load_user(username, filename="data/users.json"):
     """Charge un utilisateur depuis un fichier JSON."""
     if os.path.exists(filename):
         try:
@@ -44,7 +44,7 @@ def load_user(username, filename="users.json"):
             logging.error(f"Erreur de lecture du fichier {filename}")
     return None
 
-def add_user(username, password, filename="users.json"):
+def add_user(username, password, filename="data/users.json"):
     """Ajoute un nouvel utilisateur avec hashage sécurisé."""
     users = {}
     if os.path.exists(filename):
@@ -61,7 +61,7 @@ def add_user(username, password, filename="users.json"):
 
     logging.info(f"Utilisateur {username} ajouté avec succès.")
 
-def verify_user(username, password, filename="users.json"):
+def verify_user(username, password, filename="data/users.json"):
     """Vérifie les identifiants de l'utilisateur."""
     user_data = load_user(username, filename)
     if user_data:
@@ -200,7 +200,7 @@ async def handle_client_wrapper(reader, writer):
 async def main():
     """Démarre le serveur sécurisé."""
     context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-    context.load_cert_chain(certfile="server.crt", keyfile="server.key")
+    context.load_cert_chain(certfile="SSL/server.crt", keyfile="SSL/server.key")
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE  # ⚠ À modifier en production !
 
