@@ -16,8 +16,8 @@ MAX_MESSAGE_SIZE = 4024  # Taille max des messages (octets)
 # --- Configuration des limites et sécurité ---
 CONNECTION_RATE_LIMIT = 10  # Connexions max/sec
 MAX_CONNECTIONS_PER_IP = 5   # Connexions max/IP
-MAX_MESSAGE_RATE = 50        # Messages max/sec
-AUTH_TIMEOUT = 10            # Temps max pour l'authentification (s)
+MAX_MESSAGE_RATE = 10        # Messages max/sec
+AUTH_TIMEOUT = 20            # Temps max pour l'authentification (s)
 MAX_FAILED_LOGIN_ATTEMPTS = 3  # Essais avant blocage
 ACCOUNT_LOCKOUT_DURATION = 60  # Durée de blocage du compte (s)
 IP_LOCKOUT_DURATION = 120      # Durée de blocage de l'IP (s)
