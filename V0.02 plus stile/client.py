@@ -9,6 +9,7 @@ from Crypto.Util.Padding import pad, unpad
 import base64
 import socket
 import threading
+import os
 
 HOST = '127.0.0.1'
 PORT = 54424
@@ -62,6 +63,76 @@ def receive_messages(client_socket, cle_session):
             print("❌ Connexion au serveur perdue.")
             break
 
+
+# Fonction pour les menue
+def clear_screen():
+    """Clears the terminal screen."""
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+
+def aff_menu():
+    clear_screen()
+    print("╔═════════════════════════════╗")
+    print("║       Menu Principal        ║")
+    print("╠═════════════════════════════╣")
+    print("║ 1. Menu Contextuel          ║")
+    print("║ 2. Créer un groupe          ║")
+    print("║ 3. Ajouter un ami           ║")
+    print("║ 4. Bloquer un utilisateur   ║")
+    print("║ 5. Signaler                 ║")
+    print("║ 6. Quitter                  ║")
+    print("╚═════════════════════════════╝")
+    choice = input("  Choisissez une option: ")
+    if choice == '1':
+        print(f"Menue {choice} affiché")
+        autre_menu()
+    elif choice == '2':
+        print(f"Menue {choice} affiché")
+        autre_menu()
+    elif choice == '3':
+        print(f"Menue {choice} affiché")
+        autre_menu()
+    elif choice == '4':
+        print(f"Menue {choice} affiché")
+        autre_menu()
+    elif choice == '5':
+        print(f"Menue {choice} affiché")
+        autre_menu()
+    elif choice == '6':
+        print("Au revoir!")
+        exit()
+    else:
+        print("Option invalide.")
+        input("Appuyez sur Entrée pour continuer...")
+        aff_menu()
+
+def autre_menu():
+    """Displays the contextual menu with a stylized look."""
+    clear_screen()
+    print("╔═════════════════════════════╗")
+    print("║       Menu Autre            ║")
+    print("╠═════════════════════════════╣")
+    print("║ 1. Option 1                 ║")
+    print("║ 2. Option 2                 ║")
+    print("║ 3. Retour au menu principal ║")
+    print("╚═════════════════════════════╝")
+    choice = input("  Choisissez une option: ")
+    if choice == '1':
+        print("Option 1 sélectionnée.")
+        input("Appuyez sur Entrée pour continuer...")
+        autre_menu()
+    elif choice == '2':
+        print("Option 2 sélectionnée.")
+        input("Appuyez sur Entrée pour continuer...")
+        autre_menu()
+    elif choice == '3':
+        aff_menu()
+    else:
+        print("Option invalide.")
+        input("Appuyez sur Entrée pour continuer...")
+        autre_menu()
+
+        
 # Connexion au serveur avec gestion de la connexion SSL
 try:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
@@ -90,7 +161,8 @@ try:
         cle_utilisateur = getpass.getpass("🔑 Entrez votre clé de chiffrement : ")
 
         threading.Thread(target=receive_messages, args=(secure_client, cle_utilisateur), daemon=True).start()
-
+        
+        # Boucle principale de programme
         while True:
             message = input("> ")
             if message.lower() == "exit":
