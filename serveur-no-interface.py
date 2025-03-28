@@ -207,7 +207,7 @@ async def main():
     context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
     context.load_cert_chain(certfile="SSL/server.crt", keyfile="SSL/server.key")
     context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE  # ⚠ À modifier en production !
+    context.verify_mode = ssl.CERT_NONE  # /!\ À modifier en production !
 
     server = await asyncio.start_server(handle_client_wrapper, HOST, PORT, ssl=context)
     logging.info(f"Serveur en écoute sur {HOST}:{PORT}")
