@@ -7,10 +7,13 @@ import json
 import time
 import logging
 from collections import defaultdict
+##############################
+#Variables de configuration
 
 # --- Configuration générale ---
 HOST = '127.0.0.1'
 PORT = 54424
+
 MAX_MESSAGE_SIZE = 4024  # Taille max des messages (octets)
 
 # --- Configuration des limites et sécurité ---
@@ -30,6 +33,8 @@ IP_FAILED_LOGIN_ATTEMPTS = defaultdict(int)
 ACCOUNT_LOCKOUT_UNTIL = defaultdict(float)
 IP_LOCKOUT_UNTIL = defaultdict(float)
 
+## fin des vraibles de configuration
+##############################
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # --- Gestion des utilisateurs ---
