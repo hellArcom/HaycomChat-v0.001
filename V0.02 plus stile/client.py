@@ -14,10 +14,13 @@ import os
 HOST = '127.0.0.1'
 PORT = 54424
 
-# Création du contexte SSL
-context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile="SSL/server.crt")
-context.check_hostname = False
-context.verify_mode = ssl.CERT_NONE
+try:
+    # Création du contexte SSL
+    context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile="SSL/server.crt")
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+except:
+    print("Erreur lors de la création du contexte SSL. (server.crt et surment manquant.)")
 
 def aes_encrypt(texte, cle_utilisateur):
     try:
