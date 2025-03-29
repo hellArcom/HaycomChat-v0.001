@@ -64,7 +64,9 @@ def add_user(username, password, filename="data/users.json"):
         if os.path.exists(filename):
             with open(filename, "r") as file:
                 users = json.load(file)
-
+        if username in users:
+            return False
+ 
         salt = os.urandom(16)
         password_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
 
@@ -74,26 +76,35 @@ def add_user(username, password, filename="data/users.json"):
             json.dump(users, file, indent=4)
 
         logging.info(f"Utilisateur {username} ajouté avec succès.")
+        return True
 
     except Exception as e:
         logging.error(f"Erreur lors de l'ajout de l'utilisateur {username}: {e}")
+        return False
 
-#Vérifier les identifiants de l'utilisateur
-def verify_user(username, password, filename="data/users.json"):
+async def create_account(reader, writer, ip_address):
+    """Gère la création d'un nouveau compte."""
     try:
-        """Vérifie les identifiants de l'utilisateur."""
-        user_data = load_user(username, filename)
-        if user_data:
-            stored_hash = bytes.fromhex(user_data["password_hash"])
-            salt = bytes.fromhex(user_data["salt"])
-            received_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
-            return hmac.compare_digest(stored_hash, received_hash)
-        return False
+        username = (await asyncio.wait_for(reader.read(1024), timeout=AUTH_TIMEOUT)).decode().strip()
+        password = (await asyncio.wait_for(reader.read(1024), timeout=AUTH_TIMEOUT)).decode().strip()
+
+        if add_user(username, password):
+            writer.write(b"ACCOUNT_CREATED")
+            await writer.drain()
+            logging.info(f"Nouveau compte créé : {username} ({ip_address})")
+        else:
+            writer.write(b"USERNAME_TAKEN")
+            await writer.drain()
+            logging.warning(f"Tentative de création de compte avec un nom d'utilisateur déjà pris : {username} ({ip_address})")
+    except asyncio.TimeoutError:
+        logging.warning(f"Temps dépassé pour la création de compte {ip_address}")
+        writer.write(b"AUTH_FAIL")
+        await writer.drain()
     except Exception as e:
-        logging.error(f"Erreur lors de la vérification de l'utilisateur {username}: {e}")
-        return False
-        
-# --- Authentification ---
+        logging.error(f"Erreur lors de la création du compte : {e}")
+        writer.write(b"AUTH_FAIL")
+        await writer.drain()
+
 async def authenticate(reader, writer, ip_address):
     """Gère l'authentification des utilisateurs."""
     current_time = time.time()
@@ -110,6 +121,11 @@ async def authenticate(reader, writer, ip_address):
         writer.write(b"IDENTIFIANT : ")
         await writer.drain()
         username = (await asyncio.wait_for(reader.read(1024), timeout=AUTH_TIMEOUT)).decode().strip()
+
+        # Vérifier si c'est une demande de création de compte
+        if username == "CREATE_ACCOUNT":
+            await create_account(reader, writer, ip_address)
+            return None # Ne pas continuer l'authentification si c'est une création de compte
 
         writer.write(b"MOT DE PASSE : ")
         await writer.drain()
@@ -135,6 +151,21 @@ async def authenticate(reader, writer, ip_address):
     writer.write(b"AUTH_FAIL")
     await writer.drain()
     return None
+ 
+#Vérifier les identifiants de l'utilisateur
+def verify_user(username, password, filename="data/users.json"):
+    try:
+        """Vérifie les identifiants de l'utilisateur."""
+        user_data = load_user(username, filename)
+        if user_data:
+            stored_hash = bytes.fromhex(user_data["password_hash"])
+            salt = bytes.fromhex(user_data["salt"])
+            received_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
+            return hmac.compare_digest(stored_hash, received_hash)
+        return False
+    except Exception as e:
+        logging.error(f"Erreur lors de la vérification de l'utilisateur {username}: {e}")
+        return False
 
 # --- Gestion des clients ---
 async def handle_client(reader, writer, username, ip_address):

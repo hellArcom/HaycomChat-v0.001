@@ -11,14 +11,14 @@ import socket
 import threading
 import os
 
-HOST = '127.0.0.1'
+HOST = '127.0.0.1'  #ip du serveur
 PORT = 54424
 
 try:
     # Création du contexte SSL
-    context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile="SSL/server.crt")
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
+    context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile="SSL/server.crt") #catfile=endroit/du/ssl
+    context.check_hostname = False #desactiver la verif
+    context.verify_mode = ssl.CERT_NONE #desactiver la verif
 except:
     print("Erreur lors de la création du contexte SSL. (server.crt et surment manquant.)")
 
@@ -130,6 +130,29 @@ def env_msg(secure_client, cle_utilisateur, username):
     except:
         print("Erreur avec la fonction d'envoie des message.")
 
+def cree_compte():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
+        client.connect((HOST, PORT))
+        secure_client = context.wrap_socket(client, server_hostname=HOST)
+
+        secure_client.send(b"CREATE_ACCOUNT")  # Indique au serveur qu'on veut créer un compte
+
+        username = input("Nom d'utilisateur : ")
+        secure_client.send(username.encode())
+
+        password = getpass.getpass("Mot de passe : ")
+        secure_client.send(password.encode())
+
+        response = secure_client.recv(1024).decode()
+        if response == "ACCOUNT_CREATED":
+            print("✅ Compte créé avec succès !")
+        elif response == "USERNAME_TAKEN":
+            print("❌ Ce nom d'utilisateur est déjà pris.")
+        else:
+            print("❌ Erreur lors de la création du compte.")
+        secure_client.close()
+        input("Appuyez sur Entrée pour continuer...")
+        Start_menu()
 
 # Fonction pour les menue
 def clear_ecran():
@@ -153,25 +176,24 @@ def aff_menu(secure_client, username, cle_utilisateur):
     print("╚═════════════════════════════╝")
     choix = input("  Choisissez une option: ")
     if choix == '1':
-        print(f"Menue {choix} affiché")
+        print(f"Vous avez choisit {choix} Le menue envoyez un message est affiché")
         env_msg(secure_client, cle_utilisateur, username) # Pass secure_client, username and cle_utilisateur
     elif choix == '2':
-        print(f"Menue {choix} affiché")
+        print(f"Vous avez choisit {choix} Pour créé un groupe (option non disponible)")
         autre_menu(secure_client, username, cle_utilisateur)
     elif choix == '3':
-        print(f"Menue {choix} affiché")
+        print(f"Vous avvez choisit {choix} Pour Ajouter un ami (vous avez pas d'ami) (option non disponible)")
         autre_menu(secure_client, username, cle_utilisateur)
     elif choix == '4':
-        print(f"Menue {choix} affiché")
+        print(f"Vous avvez choisit {choix} pour bloquer un utilisateur (option non disponible)")
         autre_menu(secure_client, username, cle_utilisateur)
     elif choix == '5':
-        print(f"Menue {choix} affiché")
+        print(f"Menue {choix} affiché pour signaler (option non disponible)")
         autre_menu(secure_client, username, cle_utilisateur)
     elif choix == '6':
         print("Au revoir!")
-        secure_client.send(b"EXIT") # Send an exit signal to the server
-        secure_client.shutdown(socket.SHUT_RDWR) # Ensure both read and write are closed
-        secure_client.close()
+        secure_client.send(b"EXIT") # Envoyez les message de déconnection aux serveur
+        secure_client.shutdown(socket.SHUT_RDWR) # Fermer la connection en lecture seul
     else:
         print("Option invalide.")
         input("Appuyez sur Entrée pour continuer...")
@@ -219,7 +241,7 @@ def Start_menu():
     elif choix == '2':
         print("créé un compte.")
         input("Appuyez sur Entrée pour continuer...")
-        ()
+        cree_compte()
     elif choix == '3':
         print("Vous avez choisit de fermer le programme.")
         exit()
