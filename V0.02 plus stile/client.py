@@ -20,34 +20,43 @@ context.check_hostname = False
 context.verify_mode = ssl.CERT_NONE
 
 def aes_encrypt(texte, cle_utilisateur):
-    """Chiffre le texte avec AES en utilisant une clé dérivée"""
-    salt = get_random_bytes(16)
-    key = scrypt(cle_utilisateur.encode(), salt, key_len=32, N=2**14, r=8, p=1)
+    try:
+        """Chiffre le texte avec AES en utilisant une clé dérivée"""
+        salt = get_random_bytes(16)
+        key = scrypt(cle_utilisateur.encode(), salt, key_len=32, N=2**14, r=8, p=1)
 
-    iv = get_random_bytes(16)
-    cipher = AES.new(key, AES.MODE_CBC, iv)
+        iv = get_random_bytes(16)
+        cipher = AES.new(key, AES.MODE_CBC, iv)
 
-    # Appliquer un padding PKCS7
-    texte_padded = pad(texte.encode(), AES.block_size)
+        # Appliquer un padding PKCS7
+        texte_padded = pad(texte.encode(), AES.block_size)
 
-    encrypted_text = cipher.encrypt(texte_padded)
+        encrypted_text = cipher.encrypt(texte_padded)
 
-    return base64.b64encode(salt + iv + encrypted_text).decode()
+        return base64.b64encode(salt + iv + encrypted_text).decode()
+    except:
+        print("Erreur lors du chiffrement.")
+        return None
+
 
 def aes_decrypt(texte_chiffre, cle_utilisateur):
-    """Déchiffre le texte avec AES"""
-    data = base64.b64decode(texte_chiffre)
-    salt, iv, encrypted_text = data[:16], data[16:32], data[32:]
+    try: 
+        """Déchiffre le texte avec AES"""
+        data = base64.b64decode(texte_chiffre)
+        salt, iv, encrypted_text = data[:16], data[16:32], data[32:]
 
-    key = scrypt(cle_utilisateur.encode(), salt, key_len=32, N=2**14, r=8, p=1)
-    cipher = AES.new(key, AES.MODE_CBC, iv)
+        key = scrypt(cle_utilisateur.encode(), salt, key_len=32, N=2**14, r=8, p=1)
+        cipher = AES.new(key, AES.MODE_CBC, iv)
 
-    decrypted_text = cipher.decrypt(encrypted_text)
+        decrypted_text = cipher.decrypt(encrypted_text)
 
-    # Retirer le padding PKCS7 proprement
-    decrypted_text = unpad(decrypted_text, AES.block_size)
+        # Retirer le padding PKCS7 proprement
+        decrypted_text = unpad(decrypted_text, AES.block_size)
 
-    return decrypted_text.decode()
+        return decrypted_text.decode()
+    except:
+        print("Erreur lors du déchiffrement.")
+        return None
 
 def receive_messages(client_socket, cle_session):
     while True:
@@ -65,36 +74,42 @@ def receive_messages(client_socket, cle_session):
 
 
 def env_msg():
-    while True:
-        message = input("> ")
-        if message.lower() == "exit":
-                aff_menu()
-        if secure_client.fileno() == -1:
-            print("Connexion perdue.")
-            break
-        message = username + " : " + message  # Préfixer avec le nom d'utilisateur
-        try:
-            encrypted_message = aes_encrypt(message, cle_utilisateur)
-            secure_client.send(encrypted_message.encode())
-        except (ConnectionResetError, ssl.SSLError, ConnectionRefusedError) as e:
-            print(f"Erreur de connexion: {e}")
-            break
-        except Exception as e:
-            print(f"Erreur lors de l'envoi du message: {e}")
-            secure_client.send(b"EXIT")  # Send exit signal before closing
-            secure_client.shutdown(socket.SHUT_RDWR)
-            secure_client.close()
-            break
+    try:
+        while True:
+            message = input("> ")
+            if message.lower() == "exit":
+                    aff_menu()
+            if secure_client.fileno() == -1:
+                print("Connexion perdue.")
+                break
+            message = username + " : " + message  # Préfixer avec le nom d'utilisateur
+            try:
+                encrypted_message = aes_encrypt(message, cle_utilisateur)
+                secure_client.send(encrypted_message.encode())
+            except (ConnectionResetError, ssl.SSLError, ConnectionRefusedError) as e:
+                print(f"Erreur de connexion: {e}")
+                break
+            except Exception as e:
+                print(f"Erreur lors de l'envoi du message: {e}")
+                secure_client.send(b"EXIT")  # Send exit signal before closing
+                secure_client.shutdown(socket.SHUT_RDWR)
+                secure_client.close()
+                break
+    except:
+        print("Erreur avec la fonction d'envoie des message.")
 
 
 # Fonction pour les menue
-def clear_screen():
-    """Clears the terminal screen."""
-    os.system('cls' if os.name == 'nt' else 'clear')
+def clear_ecran():
+    """Effacer le terminal en fonction de l'OS."""
+    try:
+        os.system('cls' if os.name == 'nt' else 'clear')
+    except:
+        print("Vous utiliser un os non compatible donc l'écran na pas pu être effacé.")
 
 
 def aff_menu():
-    clear_screen()
+    clear_ecran()
     print("╔═════════════════════════════╗")
     print("║       Menu Principal        ║")
     print("╠═════════════════════════════╣")
@@ -105,23 +120,23 @@ def aff_menu():
     print("║ 5. Signaler                 ║")
     print("║ 6. Quitter                  ║")
     print("╚═════════════════════════════╝")
-    choice = input("  Choisissez une option: ")
-    if choice == '1':
-        print(f"Menue {choice} affiché")
+    choix = input("  Choisissez une option: ")
+    if choix == '1':
+        print(f"Menue {choix} affiché")
         env_msg()
-    elif choice == '2':
-        print(f"Menue {choice} affiché")
+    elif choix == '2':
+        print(f"Menue {choix} affiché")
         autre_menu()
-    elif choice == '3':
-        print(f"Menue {choice} affiché")
+    elif choix == '3':
+        print(f"Menue {choix} affiché")
         autre_menu()
-    elif choice == '4':
-        print(f"Menue {choice} affiché")
+    elif choix == '4':
+        print(f"Menue {choix} affiché")
         autre_menu()
-    elif choice == '5':
-        print(f"Menue {choice} affiché")
+    elif choix == '5':
+        print(f"Menue {choix} affiché")
         autre_menu()
-    elif choice == '6':
+    elif choix == '6':
         print("Au revoir!")
         secure_client.send(b"EXIT") # Send an exit signal to the server
         secure_client.shutdown(socket.SHUT_RDWR) # Ensure both read and write are closed
@@ -132,8 +147,7 @@ def aff_menu():
         aff_menu()
 
 def autre_menu():
-    """Displays the contextual menu with a stylized look."""
-    clear_screen()
+    clear_ecran()
     print("╔══════════════════════════════════════════╗")
     print("║ Cette option n'est pas encore disponible ║")
     print("╠══════════════════════════════════════════╣")
@@ -141,16 +155,16 @@ def autre_menu():
     print("║ 2. Donc pas tout est encore disponible   ║")
     print("║ 3. Retour au menu principal              ║")
     print("╚══════════════════════════════════════════╝")
-    choice = input("  Choisissez une option: ")
-    if choice == '1':
+    choix = input("  Choisissez une option: ")
+    if choix == '1':
         print("Option 1 sélectionnée.")
         input("Appuyez sur Entrée pour continuer...")
         autre_menu()
-    elif choice == '2':
+    elif choix == '2':
         print("Option 2 sélectionnée.")
         input("Appuyez sur Entrée pour continuer...")
         autre_menu()
-    elif choice == '3':
+    elif choix == '3':
         aff_menu()
     else:
         print("Option invalide.")
@@ -190,7 +204,6 @@ try:
         aff_menu()
         
         
-
 except Exception as e:
     print(f"❌ Une erreur est survenue: {e}")
 
