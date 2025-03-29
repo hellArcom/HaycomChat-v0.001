@@ -15,7 +15,7 @@ HOST = '127.0.0.1'
 PORT = 54424
 
 # Création du contexte SSL
-context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile="server.crt")
+context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile="SSL/server.crt")
 context.check_hostname = False
 context.verify_mode = ssl.CERT_NONE
 
@@ -132,7 +132,7 @@ def autre_menu():
         input("Appuyez sur Entrée pour continuer...")
         autre_menu()
 
-        
+
 # Connexion au serveur avec gestion de la connexion SSL
 try:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
