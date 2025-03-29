@@ -64,6 +64,29 @@ def receive_messages(client_socket, cle_session):
             break
 
 
+def env_msg():
+    while True:
+        message = input("> ")
+        if message.lower() == "exit":
+                aff_menu()
+        if secure_client.fileno() == -1:
+            print("Connexion perdue.")
+            break
+        message = username + " : " + message  # Préfixer avec le nom d'utilisateur
+        try:
+            encrypted_message = aes_encrypt(message, cle_utilisateur)
+            secure_client.send(encrypted_message.encode())
+        except (ConnectionResetError, ssl.SSLError, ConnectionRefusedError) as e:
+            print(f"Erreur de connexion: {e}")
+            break
+        except Exception as e:
+            print(f"Erreur lors de l'envoi du message: {e}")
+            secure_client.send(b"EXIT")  # Send exit signal before closing
+            secure_client.shutdown(socket.SHUT_RDWR)
+            secure_client.close()
+            break
+
+
 # Fonction pour les menue
 def clear_screen():
     """Clears the terminal screen."""
@@ -75,7 +98,7 @@ def aff_menu():
     print("╔═════════════════════════════╗")
     print("║       Menu Principal        ║")
     print("╠═════════════════════════════╣")
-    print("║ 1. Menu Contextuel          ║")
+    print("║ 1. Envoyez un message       ║")
     print("║ 2. Créer un groupe          ║")
     print("║ 3. Ajouter un ami           ║")
     print("║ 4. Bloquer un utilisateur   ║")
@@ -85,7 +108,7 @@ def aff_menu():
     choice = input("  Choisissez une option: ")
     if choice == '1':
         print(f"Menue {choice} affiché")
-        autre_menu()
+        env_msg()
     elif choice == '2':
         print(f"Menue {choice} affiché")
         autre_menu()
@@ -100,7 +123,9 @@ def aff_menu():
         autre_menu()
     elif choice == '6':
         print("Au revoir!")
-        exit()
+        secure_client.send(b"EXIT") # Send an exit signal to the server
+        secure_client.shutdown(socket.SHUT_RDWR) # Ensure both read and write are closed
+        secure_client.close()
     else:
         print("Option invalide.")
         input("Appuyez sur Entrée pour continuer...")
@@ -109,13 +134,13 @@ def aff_menu():
 def autre_menu():
     """Displays the contextual menu with a stylized look."""
     clear_screen()
-    print("╔═════════════════════════════╗")
-    print("║       Menu Autre            ║")
-    print("╠═════════════════════════════╣")
-    print("║ 1. Option 1                 ║")
-    print("║ 2. Option 2                 ║")
-    print("║ 3. Retour au menu principal ║")
-    print("╚═════════════════════════════╝")
+    print("╔══════════════════════════════════════════╗")
+    print("║ Cette option n'est pas encore disponible ║")
+    print("╠══════════════════════════════════════════╣")
+    print("║ 1. HaycomChat est en cours de dev        ║")
+    print("║ 2. Donc pas tout est encore disponible   ║")
+    print("║ 3. Retour au menu principal              ║")
+    print("╚══════════════════════════════════════════╝")
     choice = input("  Choisissez une option: ")
     if choice == '1':
         print("Option 1 sélectionnée.")
@@ -162,31 +187,9 @@ try:
 
         threading.Thread(target=receive_messages, args=(secure_client, cle_utilisateur), daemon=True).start()
         
-        # Boucle principale de programme
-        while True:
-            message = input("> ")
-            if message.lower() == "exit":
-                    secure_client.send(b"EXIT") # Send an exit signal to the server
-                    secure_client.shutdown(socket.SHUT_RDWR) # Ensure both read and write are closed
-                    secure_client.close()
-                    break
-            if secure_client.fileno() == -1:
-                print("Connexion perdue.")
-                break
-            message = username + " : " + message  # Préfixer avec le nom d'utilisateur
-            try:
-                encrypted_message = aes_encrypt(message, cle_utilisateur)
-                secure_client.send(encrypted_message.encode())
-            except (ConnectionResetError, ssl.SSLError, ConnectionRefusedError) as e:
-                print(f"Erreur de connexion: {e}")
-                break
-            except Exception as e:
-                print(f"Erreur lors de l'envoi du message: {e}")
-                secure_client.send(b"EXIT")  # Send exit signal before closing
-                secure_client.shutdown(socket.SHUT_RDWR)
-                secure_client.close()
-                break
-
+        aff_menu()
+        
+        
 
 except Exception as e:
     print(f"❌ Une erreur est survenue: {e}")
