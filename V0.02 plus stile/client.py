@@ -174,21 +174,22 @@ def autre_menu():
 
 # Connexion au serveur avec gestion de la connexion SSL
 try:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
-        client.connect((HOST, PORT))
+    
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client: #créé un sokcet en ipv4 en utilisant TCP
+        client.connect((HOST, PORT)) # Ce connecter aux serveur
         print("🔐 Connexion au serveur en cours...")
-        secure_client = context.wrap_socket(client, server_hostname=HOST)
+        secure_client = context.wrap_socket(client, server_hostname=HOST) # Sécuriser la connection TCP avec SSL
 
         # Authentification (PLAIN TEXT)
-        print(secure_client.recv(1024).decode(), end="")
+        print(secure_client.recv(1024).decode(), end="") # Afficher le texte d'authtification reçus pas le serveur
         username = input()
-        secure_client.send(username.encode())
+        secure_client.send(username.encode()) #Envoyez l'ID
 
         print(secure_client.recv(1024).decode(), end="")
-        password = getpass.getpass()
-        secure_client.send(password.encode())
-
-        auth_response = secure_client.recv(1024).decode()
+        password = getpass.getpass() #Faire que on voye pas le mdp qui est écrit pour la sécuriter
+        secure_client.send(password.encode()) #Envoyez le mdp
+        
+        auth_response = secure_client.recv(1024).decode() # Afficher la réponse du serveur
         if auth_response == "AUTH_FAIL":
             print("❌ Authentification échouée !")
             secure_client.close()
@@ -197,15 +198,15 @@ try:
         print("✅ Authentification réussie ! Vous pouvez maintenant discuter.")
 
         # Demande de clé de chiffrement à l'utilisateur APRÈS l'authentification
-        cle_utilisateur = getpass.getpass("🔑 Entrez votre clé de chiffrement : ")
+        cle_utilisateur = getpass.getpass("🔑 Entrez votre clé de chiffrement : ") #Entrer le la clé de chiffrement 
 
-        threading.Thread(target=receive_messages, args=(secure_client, cle_utilisateur), daemon=True).start()
+        threading.Thread(target=receive_messages, args=(secure_client, cle_utilisateur), daemon=True).start() #Lancer le thread des message reçu
         
-        aff_menu()
-        
-        
+        aff_menu() #afficher le menu
+              
 except Exception as e:
-    print(f"❌ Une erreur est survenue: {e}")
+    print(f"❌ Une erreur est survenue: ( {e} )")
+
 
 print("❌ Connexion au serveur perdue.")
 secure_client.close()
