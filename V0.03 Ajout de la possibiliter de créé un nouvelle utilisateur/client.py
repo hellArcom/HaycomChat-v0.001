@@ -50,6 +50,7 @@ def login():
         cle_utilisateur = getpass.getpass("🔑 Entrez votre clé de chiffrement : ") #Entrer le la clé de chiffrement 
 
         threading.Thread(target=receive_messages, args=(secure_client, cle_utilisateur), daemon=True).start() #Lancer le thread des message reçu
+        aff_menu(secure_client, username, cle_utilisateur) # Call aff_menu after login and pass secure_client, username and cle_utilisateur
 
 def aes_encrypt(texte, cle_utilisateur):
     try:
@@ -88,7 +89,7 @@ def aes_decrypt(texte_chiffre, cle_utilisateur):
         return decrypted_text.decode()
     except:
         print("Erreur lors du déchiffrement.")
-        return None
+        return "⚠️ Impossible de déchiffrer le message reçu. Ignoré. "
 
 def receive_messages(client_socket, cle_session):
     while True:
@@ -109,7 +110,7 @@ def env_msg(secure_client, cle_utilisateur, username):
         while True:
             message = input("> ")
             if message.lower() == "exit":
-                    aff_menu()
+                    aff_menu(secure_client, username, cle_utilisateur)
             if secure_client.fileno() == -1:
                 print("Connexion perdue.")
                 break
@@ -138,7 +139,7 @@ def clear_ecran():
     except:
         print("Vous utiliser un os non compatible donc l'écran na pas pu être effacé.")
 
-def aff_menu(secure_client):
+def aff_menu(secure_client, username, cle_utilisateur):
     clear_ecran()
     print("╔═════════════════════════════╗")
     print("║       Menu Principal        ║")
@@ -153,19 +154,19 @@ def aff_menu(secure_client):
     choix = input("  Choisissez une option: ")
     if choix == '1':
         print(f"Menue {choix} affiché")
-        env_msg()
+        env_msg(secure_client, cle_utilisateur, username) # Pass secure_client, username and cle_utilisateur
     elif choix == '2':
         print(f"Menue {choix} affiché")
-        autre_menu()
+        autre_menu(secure_client, username, cle_utilisateur)
     elif choix == '3':
         print(f"Menue {choix} affiché")
-        autre_menu()
+        autre_menu(secure_client, username, cle_utilisateur)
     elif choix == '4':
         print(f"Menue {choix} affiché")
-        autre_menu()
+        autre_menu(secure_client, username, cle_utilisateur)
     elif choix == '5':
         print(f"Menue {choix} affiché")
-        autre_menu()
+        autre_menu(secure_client, username, cle_utilisateur)
     elif choix == '6':
         print("Au revoir!")
         secure_client.send(b"EXIT") # Send an exit signal to the server
@@ -174,9 +175,9 @@ def aff_menu(secure_client):
     else:
         print("Option invalide.")
         input("Appuyez sur Entrée pour continuer...")
-        aff_menu()
+        aff_menu(secure_client, username, cle_utilisateur)
 
-def autre_menu():
+def autre_menu(secure_client, username, cle_utilisateur):
     clear_ecran()
     print("╔══════════════════════════════════════════╗")
     print("║ Cette option n'est pas encore disponible ║")
@@ -189,17 +190,17 @@ def autre_menu():
     if choix == '1':
         print("Option 1 sélectionnée.")
         input("Appuyez sur Entrée pour continuer...")
-        autre_menu()
+        autre_menu(secure_client, username, cle_utilisateur)
     elif choix == '2':
         print("Option 2 sélectionnée.")
         input("Appuyez sur Entrée pour continuer...")
-        autre_menu()
+        autre_menu(secure_client, username, cle_utilisateur)
     elif choix == '3':
-        aff_menu()
+        aff_menu(secure_client, username, cle_utilisateur)
     else:
         print("Option invalide.")
         input("Appuyez sur Entrée pour continuer...")
-        autre_menu()
+        autre_menu(secure_client, username, cle_utilisateur)
 
 def Start_menu():
     clear_ecran()
@@ -225,7 +226,7 @@ def Start_menu():
     else:
         print("Option invalide.")
         input("Appuyez sur Entrée pour continuer...")
-        autre_menu()
+        Start_menu()
 
 # Connexion au serveur avec gestion de la connexion SSL
 try:        
@@ -234,6 +235,9 @@ except Exception as e:
     print(f"❌ Une erreur est survenue: ( {e} )")
 
 print("❌ Connexion au serveur perdue.")
-secure_client.close()
+try:
+    secure_client.close()
+except:
+    pass
 input("Appuyez sur Entrée pour quitter...")
 exit()

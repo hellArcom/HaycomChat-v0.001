@@ -223,7 +223,7 @@ async def handle_client_wrapper(reader, writer):
             await handle_client(reader, writer, username, ip_address)
 
     except Exception as e:
-        print("Erreur dans handle_client_wrapper {e}")
+        print(f"Erreur dans handle_client_wrapper {e}")
         
 async def main():
     try:

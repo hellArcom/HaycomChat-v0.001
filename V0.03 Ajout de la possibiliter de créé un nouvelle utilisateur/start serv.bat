@@ -2,5 +2,5 @@
 cls
 serveur.py
 echo.
-echo Fin de client.py.
+echo Fin de serveur.py
 pause
