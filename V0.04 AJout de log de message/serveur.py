@@ -9,7 +9,7 @@ import logging
 from collections import defaultdict
 
 ##############################
-#Variables de configuration
+# Variables de configuration
 
 # --- Configuration générale ---
 HOST = '127.0.0.1'
@@ -18,13 +18,13 @@ PORT = 54424
 MAX_MESSAGE_SIZE = 4024  # Taille max des messages (octets)
 
 # --- Configuration des limites et sécurité ---
-CONNECTION_RATE_LIMIT = 10     # Connexions max/sec
-MAX_CONNECTIONS_PER_IP = 5     # Connexions max/IP
-MAX_MESSAGE_RATE = 10          # Messages max/sec
-AUTH_TIMEOUT = 20              # Temps max pour l'authentification (s)
+CONNECTION_RATE_LIMIT = 10  # Connexions max/sec
+MAX_CONNECTIONS_PER_IP = 5  # Connexions max/IP
+MAX_MESSAGE_RATE = 10  # Messages max/sec
+AUTH_TIMEOUT = 20  # Temps max pour l'authentification (s)
 MAX_FAILED_LOGIN_ATTEMPTS = 3  # Essais avant blocage
 ACCOUNT_LOCKOUT_DURATION = 60  # Durée de blocage du compte (s)
-IP_LOCKOUT_DURATION = 120      # Durée de blocage de l'IP (s)
+IP_LOCKOUT_DURATION = 120  # Durée de blocage de l'IP (s)
 
 # --- Logs et gestion des connexions ---
 clients = {}
@@ -43,37 +43,53 @@ try:
 except:
     print("Erreur lors de la configuration des logs.")
 
+
 # --- Gestion des utilisateurs ---
 # Charger les utilisateur de la DB
-def load_user(username, filename="data/users.json"):
-    """Charge un utilisateur depuis un fichier JSON."""
+def load_users_data(filename="Data/user.json"):
+    """Charge les données des utilisateurs depuis un fichier JSON."""
     if os.path.exists(filename):
         try:
             with open(filename, "r") as file:
-                users = json.load(file)
-                return users.get(username)
+                return json.load(file)
         except json.JSONDecodeError:
             logging.error(f"Erreur de lecture du fichier {filename}")
-    return None
+    return {"utilisateurs": {}, "groupes": {}, "demandes_amis": []}
 
-#Ajouter un utilisateur a la base de donner
-def add_user(username, password, filename="data/users.json"):
+
+def load_user(username, filename="Data/user.json"):
+    """Charge un utilisateur depuis un fichier JSON."""
+    users_data = load_users_data(filename)
+    return users_data["utilisateurs"].get(username)
+
+
+# Ajouter un utilisateur a la base de donner
+def add_user(username, password, filename="Data/user.json"):
+    """Ajoute un nouvel utilisateur avec hashage sécurisé."""
     try:
-        """Ajoute un nouvel utilisateur avec hashage sécurisé."""
-        users = {}
-        if os.path.exists(filename):
-            with open(filename, "r") as file:
-                users = json.load(file)
+        users_data = load_users_data(filename)
+        users = users_data["utilisateurs"]
+
         if username in users:
             return False
- 
+
+        # Générer un salt aléatoire
         salt = os.urandom(16)
+
+        # Hasher le mot de passe avec le salt
         password_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
 
-        users[username] = {"password_hash": password_hash.hex(), "salt": salt.hex()}
+        users[username] = {
+            "mot_de_passe": password_hash.hex(),  # Stocker le hash en hexadécimal
+            "salt": salt.hex(),  # Stocker le salt en hexadécimal
+            "amis": [],
+            "bloques": [],
+            "sessions": [],
+            "derniere_connexion": time.strftime("%Y-%m-%dT%H:%M:%S")
+        }
 
         with open(filename, "w") as file:
-            json.dump(users, file, indent=4)
+            json.dump(users_data, file, indent=4)
 
         logging.info(f"Utilisateur {username} ajouté avec succès.")
         return True
@@ -95,7 +111,8 @@ async def create_account(reader, writer, ip_address):
         else:
             writer.write(b"USERNAME_TAKEN")
             await writer.drain()
-            logging.warning(f"Tentative de création de compte avec un nom d'utilisateur déjà pris : {username} ({ip_address})")
+            logging.warning(
+                f"Tentative de création de compte avec un nom d'utilisateur déjà pris : {username} ({ip_address})")
     except asyncio.TimeoutError:
         logging.warning(f"Temps dépassé pour la création de compte {ip_address}")
         writer.write(b"AUTH_FAIL")
@@ -104,6 +121,7 @@ async def create_account(reader, writer, ip_address):
         logging.error(f"Erreur lors de la création du compte : {e}")
         writer.write(b"AUTH_FAIL")
         await writer.drain()
+
 
 async def authenticate(reader, writer, ip_address):
     """Gère l'authentification des utilisateurs."""
@@ -125,7 +143,7 @@ async def authenticate(reader, writer, ip_address):
         # Vérifier si c'est une demande de création de compte
         if username == "CREATE_ACCOUNT":
             await create_account(reader, writer, ip_address)
-            return None # Ne pas continuer l'authentification si c'est une création de compte
+            return None  # Ne pas continuer l'authentification si c'est une création de compte
 
         writer.write(b"MOT DE PASSE : ")
         await writer.drain()
@@ -133,8 +151,9 @@ async def authenticate(reader, writer, ip_address):
 
         if verify_user(username, password):
             logging.info(f"Connexion réussie : {username} ({ip_address})")
-            writer.write(b"AUTH_SUCCESS") # Explicit success message
+            writer.write(b"AUTH_SUCCESS")  # Explicit success message
             await writer.drain()
+            update_last_login(username)
             return username
 
         logging.warning(f"Échec de connexion : {username} ({ip_address})")
@@ -142,7 +161,7 @@ async def authenticate(reader, writer, ip_address):
         if IP_FAILED_LOGIN_ATTEMPTS[ip_address] >= MAX_FAILED_LOGIN_ATTEMPTS:
             IP_LOCKOUT_UNTIL[ip_address] = current_time + IP_LOCKOUT_DURATION
             logging.warning(f"IP bloquée : {ip_address} ({IP_LOCKOUT_DURATION}s)")
-        
+
     except asyncio.TimeoutError:
         logging.warning(f"Temps dépassé pour {ip_address}")
     except Exception as e:
@@ -151,21 +170,68 @@ async def authenticate(reader, writer, ip_address):
     writer.write(b"AUTH_FAIL")
     await writer.drain()
     return None
- 
-#Vérifier les identifiants de l'utilisateur
-def verify_user(username, password, filename="data/users.json"):
+
+
+# Vérifier les identifiants de l'utilisateur
+def verify_user(username, password, filename="Data/user.json"):
+    """Vérifie les identifiants de l'utilisateur."""
     try:
-        """Vérifie les identifiants de l'utilisateur."""
         user_data = load_user(username, filename)
         if user_data:
-            stored_hash = bytes.fromhex(user_data["password_hash"])
+            # Récupérer le salt et le hash stocké
             salt = bytes.fromhex(user_data["salt"])
+            stored_hash = bytes.fromhex(user_data["mot_de_passe"])
+
+            # Hasher le mot de passe avec le salt récupéré
             received_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
+
+            # Comparer les hashs
+            logging.debug(f"Hash stocké: {stored_hash.hex()}")
+            logging.debug(f"Hash reçu: {received_hash.hex()}")
             return hmac.compare_digest(stored_hash, received_hash)
         return False
     except Exception as e:
         logging.error(f"Erreur lors de la vérification de l'utilisateur {username}: {e}")
         return False
+
+def update_last_login(username, filename="Data/user.json"):
+    """Met à jour la date de dernière connexion de l'utilisateur."""
+    try:
+        users_data = load_users_data(filename)
+        user = users_data["utilisateurs"].get(username)
+        if user:
+            user["derniere_connexion"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+            with open(filename, "w") as file:
+                json.dump(users_data, file, indent=4)
+    except Exception as e:
+        logging.error(f"Erreur lors de la mise à jour de la dernière connexion de {username}: {e}")
+
+# --- Gestion des messages ---
+def load_messages_data(filename="Data/msg.json"):
+    """Charge les données des messages depuis un fichier JSON."""
+    if os.path.exists(filename):
+        try:
+            with open(filename, "r") as file:
+                return json.load(file)
+        except json.JSONDecodeError:
+            logging.error(f"Erreur de lecture du fichier {filename}")
+    return {"messages": [], "signalements": [], "archives": {"messages": []}}
+
+def save_message(sender, recipient, content, filename="Data/msg.json"):
+    """Enregistre un message dans le fichier JSON."""
+    try:
+        messages_data = load_messages_data(filename)
+        messages_data["messages"].append({
+            "envoyeur": sender,
+            "destinataire": recipient,
+            "contenu": content,
+            "horodatage": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "statut": "non_lu"
+        })
+        with open(filename, "w") as file:
+            json.dump(messages_data, file, indent=4)
+    except Exception as e:
+        logging.error(f"Erreur lors de l'enregistrement du message: {e}")
 
 # --- Gestion des clients ---
 async def handle_client(reader, writer, username, ip_address):
@@ -187,14 +253,37 @@ async def handle_client(reader, writer, username, ip_address):
                 logging.warning(f"Trop de messages de {username} ({ip_address})")
                 break
 
-            # Répercuter le message aux autres clients
-            for user, client_writer in clients.items():
-                if user != username:
-                    try:
-                        client_writer.write(message)
-                        await client_writer.drain()
-                    except Exception as e:
-                        logging.error(f"Erreur d'envoi à {user}: {e}")
+            try:
+                decoded_message = message.decode()
+                if decoded_message.startswith("SEND_TO:"):
+                    parts = decoded_message.split(":", 2)
+                    if len(parts) == 3:
+                        recipient, content = parts[1], parts[2]
+                        save_message(username, recipient, content)
+                        if recipient in clients:
+                            try:
+                                # Le serveur envoie le message tel quel (chiffré)
+                                clients[recipient].write(f"MESSAGE_FROM:{username}:{content}".encode())
+                                await clients[recipient].drain()
+                            except Exception as e:
+                                logging.error(f"Erreur d'envoi à {recipient}: {e}")
+                        else:
+                            logging.warning(f"Utilisateur {recipient} non connecté.")
+                    else:
+                        logging.warning(f"Format de message invalide : {decoded_message}")
+                    continue
+                else:
+                    # Répercuter le message aux autres clients
+                    for user, client_writer in clients.items():
+                        if user != username:
+                            try:
+                                # Le serveur envoie le message tel quel (chiffré)
+                                client_writer.write(f"{username} : {decoded_message}".encode())
+                                await client_writer.drain()
+                            except Exception as e:
+                                logging.error(f"Erreur d'envoi à {user}: {e}")
+            except UnicodeDecodeError:
+                logging.error(f"Erreur de décodage du message reçu de {username}")
 
     except asyncio.CancelledError:
         pass  # Already handled
@@ -206,7 +295,8 @@ async def handle_client(reader, writer, username, ip_address):
     except asyncio.CancelledError:
         pass
     except OSError as e:
-        logging.error(f"Erreur (OSError) pour {username}: {e} (un client s'est déconnecté brutalement en fermant le terminal (le plus probable) ?)")
+        logging.error(
+            f"Erreur (OSError) pour {username}: {e} (un client s'est déconnecté brutalement en fermant le terminal (le plus probable) ?)")
     except Exception as e:
         logging.error(f"Erreur dans handle_client pour {username}: {e}")
     finally:
@@ -215,6 +305,7 @@ async def handle_client(reader, writer, username, ip_address):
         if not writer.is_closing():
             writer.close()
         await writer.wait_closed()
+
 
 async def handle_client_wrapper(reader, writer):
     """Gère la connexion, applique les limites et démarre la session client."""
@@ -255,7 +346,8 @@ async def handle_client_wrapper(reader, writer):
 
     except Exception as e:
         print(f"Erreur dans handle_client_wrapper {e}")
-        
+
+
 async def main():
     try:
         """Démarre le serveur sécurisé."""
@@ -270,6 +362,7 @@ async def main():
     except Exception as e:
         print(f"Erreur lors du démarrage du serveur. (Dans async def main) erreur : {e}")
         logging.error(f"Erreur lors du démarrage du serveur : {e}")
+
 
 if __name__ == "__main__":
     try:

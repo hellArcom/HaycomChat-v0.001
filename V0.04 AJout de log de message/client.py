@@ -1,7 +1,7 @@
 import socket
 import threading
 import ssl
-import getpass
+import getpass      
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 from Crypto.Protocol.KDF import scrypt
@@ -11,52 +11,68 @@ import socket
 import threading
 import os
 
-HOST = '127.0.0.1'  #ip du serveur
+HOST = '127.0.0.1'  # ip du serveur
 PORT = 54424
 
 try:
     # Création du contexte SSL
-    context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile="SSL/server.crt") #catfile=endroit/du/ssl
-    context.check_hostname = False #desactiver la verif
-    context.verify_mode = ssl.CERT_NONE #desactiver la verif
+    context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile="SSL/server.crt")  # catfile=endroit/du/ssl
+    context.check_hostname = False  # desactiver la verif
+    context.verify_mode = ssl.CERT_NONE  # desactiver la verif
 except:
     print("Erreur lors de la création du contexte SSL. (server.crt et surment manquant.)")
 
+
 def login():
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client: #créé un sokcet en ipv4 en utilisant TCP
-        client.connect((HOST, PORT)) # Ce connecter aux serveur
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:  # créé un sokcet en ipv4 en utilisant TCP
+        client.connect((HOST, PORT))  # Ce connecter aux serveur
         print("🔐 Connexion au serveur en cours...")
         global secure_client
-        secure_client = context.wrap_socket(client, server_hostname=HOST) # Sécuriser la connection TCP avec SSL
+        secure_client = context.wrap_socket(client, server_hostname=HOST)  # Sécuriser la connection TCP avec SSL
 
         # Authentification (PLAIN TEXT)
-        print(secure_client.recv(1024).decode(), end="") # Afficher le texte d'authtification reçus pas le serveur
-        username = input()
-        secure_client.send(username.encode()) #Envoyez l'ID
+        try:
+            auth_response = secure_client.recv(1024).decode()
+            if auth_response == "IP_LOCKED":
+                print("❌ Votre IP est bloquée. Réessayez plus tard.")
+                secure_client.close()
+                exit()
+            print(auth_response, end="")  # Afficher le texte d'authtification reçus pas le serveur
+            username = input()
+            secure_client.send(username.encode())  # Envoyez l'ID
 
-        print(secure_client.recv(1024).decode(), end="")
-        password = getpass.getpass() #Faire que on voye pas le mdp qui est écrit pour la sécuriter
-        secure_client.send(password.encode()) #Envoyez le mdp
-        
-        auth_response = secure_client.recv(1024).decode() # Afficher la réponse du serveur
-        if auth_response == "AUTH_FAIL":
-            print("❌ Authentification échouée !")
+            print(secure_client.recv(1024).decode(), end="")
+            password = getpass.getpass()  # Faire que on voye pas le mdp qui est écrit pour la sécuriter
+            secure_client.send(password.encode())  # Envoyez le mdp
+
+            auth_response = secure_client.recv(1024).decode()  # Afficher la réponse du serveur
+            if auth_response == "AUTH_FAIL":
+                print("❌ Authentification échouée !")
+                secure_client.close()
+                exit()
+            elif auth_response == "AUTH_SUCCESS":
+                print("✅ Authentification réussie ! Vous pouvez maintenant discuter.")
+            else:
+                print("❌ Erreur d'authentification.")
+                secure_client.close()
+                exit()
+        except Exception as e:
+            print(f"❌ Erreur d'authentification : {e}")
             secure_client.close()
             exit()
 
-        print("✅ Authentification réussie ! Vous pouvez maintenant discuter.")
-
         # Demande de clé de chiffrement à l'utilisateur APRÈS l'authentification
-        cle_utilisateur = getpass.getpass("🔑 Entrez votre clé de chiffrement : ") #Entrer le la clé de chiffrement 
+        cle_utilisateur = getpass.getpass("🔑 Entrez votre clé de chiffrement : ")  # Entrer le la clé de chiffrement
 
-        threading.Thread(target=receive_messages, args=(secure_client, cle_utilisateur), daemon=True).start() #Lancer le thread des message reçu
-        aff_menu(secure_client, username, cle_utilisateur) # Call aff_menu after login and pass secure_client, username and cle_utilisateur
+        threading.Thread(target=receive_messages, args=(secure_client, cle_utilisateur), daemon=True).start()  # Lancer le thread des message reçu
+        aff_menu(secure_client, username, cle_utilisateur)  # Call aff_menu after login and pass secure_client, username and cle_utilisateur
+
 
 def aes_encrypt(texte, cle_utilisateur):
     try:
         """Chiffre le texte avec AES en utilisant une clé dérivée"""
         salt = get_random_bytes(16)
-        key = scrypt(cle_utilisateur.encode(), salt, key_len=32, N=2**14, r=8, p=1)
+        key = scrypt(cle_utilisateur.encode(), salt, key_len=32, N=2 ** 14, r=8, p=1)
 
         iv = get_random_bytes(16)
         cipher = AES.new(key, AES.MODE_CBC, iv)
@@ -73,12 +89,12 @@ def aes_encrypt(texte, cle_utilisateur):
 
 
 def aes_decrypt(texte_chiffre, cle_utilisateur):
-    try: 
+    try:
         """Déchiffre le texte avec AES"""
         data = base64.b64decode(texte_chiffre)
         salt, iv, encrypted_text = data[:16], data[16:32], data[32:]
 
-        key = scrypt(cle_utilisateur.encode(), salt, key_len=32, N=2**14, r=8, p=1)
+        key = scrypt(cle_utilisateur.encode(), salt, key_len=32, N=2 ** 14, r=8, p=1)
         cipher = AES.new(key, AES.MODE_CBC, iv)
 
         decrypted_text = cipher.decrypt(encrypted_text)
@@ -91,34 +107,53 @@ def aes_decrypt(texte_chiffre, cle_utilisateur):
         print("Erreur lors du déchiffrement.")
         return "⚠️ Impossible de déchiffrer le message reçu. Ignoré. "
 
+
 def receive_messages(client_socket, cle_session):
     while True:
         try:
             encrypted_message = client_socket.recv(1024).decode()
             if encrypted_message:
-                try:
-                    decrypted_message = aes_decrypt(encrypted_message, cle_session)
-                    print(f"\n📥 Message reçu : {decrypted_message}\n> ", end="")
-                except (ValueError, KeyError):
-                    print("\n⚠️ Impossible de déchiffrer un message reçu. Ignoré.\n> ", end="")
+                if encrypted_message.startswith("MESSAGE_FROM:"):
+                    parts = encrypted_message.split(":", 2)
+                    if len(parts) == 3:
+                        sender, content = parts[1], parts[2]
+                        try:
+                            decrypted_message = aes_decrypt(content, cle_session)
+                            print(f"\n📥 Message de {sender} : {decrypted_message}\n> ", end="")
+                        except:
+                            print(f"\n⚠️ Impossible de déchiffrer le message reçu de {sender}. Ignoré.\n> ", end="")
+                    else:
+                        print(f"\n⚠️ Message reçu dans un format invalide : {encrypted_message}\n> ", end="")
+                else:
+                    try:
+                        decrypted_message = aes_decrypt(encrypted_message, cle_session)
+                        print(f"\n📥 Message reçu : {decrypted_message}\n> ", end="")
+                    except:
+                        print(f"\n⚠️ Impossible de déchiffrer le message reçu. Ignoré.\n> ", end="")
         except:
             print("❌ Connexion au serveur perdue.")
             break
+
+
 
 def env_msg(secure_client, cle_utilisateur, username):
     try:
         while True:
             print("Entrer exit en tant que message pour quitter.")
-            message = input("> ")
+            recipient = input("Destinataire (ou 'all' pour tous) : ")
+            message = input("Message : ")
             if message.lower() == "exit":
-                    aff_menu(secure_client, username, cle_utilisateur)
+                aff_menu(secure_client, username, cle_utilisateur)
+                return
             if secure_client.fileno() == -1:
                 print("Connexion perdue.")
                 break
-            message = username + " : " + message  # Préfixer avec le nom d'utilisateur
+            if recipient.lower() == "all":
+                message_to_send = aes_encrypt(username + " : " + message, cle_utilisateur) # Chiffrer le message
+            else:
+                message_to_send = f"SEND_TO:{recipient}:{aes_encrypt(message, cle_utilisateur)}" # Chiffrer le message
             try:
-                encrypted_message = aes_encrypt(message, cle_utilisateur)
-                secure_client.send(encrypted_message.encode())
+                secure_client.send(message_to_send.encode())
             except (ConnectionResetError, ssl.SSLError, ConnectionRefusedError) as e:
                 print(f"Erreur de connexion: {e}")
                 break
@@ -144,14 +179,15 @@ def cree_compte():
         password = getpass.getpass("Mot de passe : ")
         secure_client.send(password.encode())
 
-        response = secure_client.recv(1024).decode()
+        response = secure_client.recv(1024).decode() # Wait for the response from the server
         if response == "ACCOUNT_CREATED":
             print("✅ Compte créé avec succès !")
         elif response == "USERNAME_TAKEN":
             print("❌ Ce nom d'utilisateur est déjà pris.")
         else:
             print("❌ Erreur lors de la création du compte.")
-        secure_client.close()
+        
+        secure_client.close() # close the connection after receiving the response.
         input("Appuyez sur Entrée pour continuer...")
         Start_menu()
 
@@ -162,6 +198,7 @@ def clear_ecran():
         os.system('cls' if os.name == 'nt' else 'clear')
     except:
         print("Vous utiliser un os non compatible donc l'écran na pas pu être effacé.")
+
 
 def aff_menu(secure_client, username, cle_utilisateur):
     clear_ecran()
@@ -178,7 +215,7 @@ def aff_menu(secure_client, username, cle_utilisateur):
     choix = input("Choisissez une option: ")
     if choix == '1':
         print(f"Vous avez choisit {choix} Le menue envoyez un message est affiché")
-        env_msg(secure_client, cle_utilisateur, username) # Pass secure_client, username and cle_utilisateur
+        env_msg(secure_client, cle_utilisateur, username)  # Pass secure_client, username and cle_utilisateur
     elif choix == '2':
         print(f"Vous avez choisit {choix} Pour créé un groupe (option non disponible)")
         autre_menu(secure_client, username, cle_utilisateur)
@@ -193,12 +230,13 @@ def aff_menu(secure_client, username, cle_utilisateur):
         autre_menu(secure_client, username, cle_utilisateur)
     elif choix == '6':
         print("Au revoir!")
-        secure_client.send(b"EXIT") # Envoyez les message de déconnection aux serveur
-        secure_client.shutdown(socket.SHUT_RDWR) # Fermer la connection en lecture seul
+        secure_client.send(b"EXIT")  # Envoyez les message de déconnection aux serveur
+        secure_client.shutdown(socket.SHUT_RDWR)  # Fermer la connection en lecture seul
     else:
         print("Option invalide.")
         input("Appuyez sur Entrée pour continuer...")
         aff_menu(secure_client, username, cle_utilisateur)
+
 
 def autre_menu(secure_client, username, cle_utilisateur):
     clear_ecran()
@@ -224,6 +262,7 @@ def autre_menu(secure_client, username, cle_utilisateur):
         print("Option invalide.")
         input("Appuyez sur Entrée pour continuer...")
         autre_menu(secure_client, username, cle_utilisateur)
+
 
 def Start_menu():
     clear_ecran()
@@ -252,8 +291,8 @@ def Start_menu():
         Start_menu()
 
 # Connexion au serveur avec gestion de la connexion SSL
-try:        
-    Start_menu() #menu de départ          
+try:
+    Start_menu()  # menu de départ
 except Exception as e:
     print(f"❌ Une erreur est survenue: ( {e} )")
 
