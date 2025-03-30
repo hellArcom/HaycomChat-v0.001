@@ -98,6 +98,7 @@ def add_user(username, password, filename="Data/user.json"):
         logging.error(f"Erreur lors de l'ajout de l'utilisateur {username}: {e}")
         return False
 
+
 async def create_account(reader, writer, ip_address):
     """Gère la création d'un nouveau compte."""
     try:
@@ -347,7 +348,6 @@ async def handle_client_wrapper(reader, writer):
     except Exception as e:
         print(f"Erreur dans handle_client_wrapper {e}")
 
-
 async def main():
     try:
         """Démarre le serveur sécurisé."""
@@ -362,7 +362,6 @@ async def main():
     except Exception as e:
         print(f"Erreur lors du démarrage du serveur. (Dans async def main) erreur : {e}")
         logging.error(f"Erreur lors du démarrage du serveur : {e}")
-
 
 if __name__ == "__main__":
     try:

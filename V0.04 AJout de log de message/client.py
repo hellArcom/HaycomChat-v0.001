@@ -149,7 +149,7 @@ def env_msg(secure_client, cle_utilisateur, username):
                 print("Connexion perdue.")
                 break
             if recipient.lower() == "all":
-                message_to_send = aes_encrypt(username + " : " + message, cle_utilisateur) # Chiffrer le message
+                message_to_send = aes_encrypt(message, cle_utilisateur) # Chiffrer le message sans le nom d'utilisateur
             else:
                 message_to_send = f"SEND_TO:{recipient}:{aes_encrypt(message, cle_utilisateur)}" # Chiffrer le message
             try:
@@ -165,6 +165,7 @@ def env_msg(secure_client, cle_utilisateur, username):
                 break
     except:
         print("Erreur avec la fonction d'envoie des message.")
+
 
 def cree_compte():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
