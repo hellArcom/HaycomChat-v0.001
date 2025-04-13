@@ -1,0 +1,3 @@
+-> Le client affiche une erreur lors de la création de compte alors que ça fonctionne.
+-> corriger le bug ou lors de la recept de msg ça mais ">" a la place du texte de base.
+-> tester voir les autre bug et fonctionnaliter pas encore fait
