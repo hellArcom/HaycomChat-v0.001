@@ -22,51 +22,93 @@ try:
 except:
     print("Erreur lors de la création du contexte SSL. (server.crt et surment manquant.)")
 
-
 def login():
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:  # créé un sokcet en ipv4 en utilisant TCP
-        client.connect((HOST, PORT))  # Ce connecter aux serveur
-        print("🔐 Connexion au serveur en cours...")
-        global secure_client
-        secure_client = context.wrap_socket(client, server_hostname=HOST)  # Sécuriser la connection TCP avec SSL
-
-        # Authentification (PLAIN TEXT)
+    # Utiliser return au lieu de exit() pour revenir au menu principal en cas d'erreur
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
         try:
-            auth_response = secure_client.recv(1024).decode()
-            if auth_response == "IP_LOCKED":
+            client.connect((HOST, PORT))
+            print("🔐 Connexion au serveur en cours...")
+            global secure_client
+            secure_client = context.wrap_socket(client, server_hostname=HOST)
+        except ConnectionRefusedError:
+             print("❌ Connexion refusée. Le serveur est-il démarré et accessible?")
+             input("Appuyez sur Entrée pour continuer...") # Pause pour voir le message
+             return # Retourne au menu
+        except Exception as e:
+             print(f"❌ Erreur de connexion initiale: {e}")
+             input("Appuyez sur Entrée pour continuer...")
+             return # Retourne au menu
+
+        # Authentification
+        try:
+            # --- MODIFICATION START ---
+            # 1. Demander l'identifiant D'ABORD
+            username = input("Identifiant : ")
+            # 2. Envoyer l'identifiant
+            secure_client.send(username.encode())
+
+            # 3. Attendre le prompt du mot de passe (ou un message d'erreur initial comme IP_LOCKED)
+            response = secure_client.recv(1024).decode()
+
+            # Gérer les erreurs potentielles reçues AVANT le prompt du mot de passe
+            # Le serveur peut envoyer IP_LOCKED immédiatement s'il détecte un blocage
+            if response == "IP_LOCKED":
                 print("❌ Votre IP est bloquée. Réessayez plus tard.")
                 secure_client.close()
-                exit()
-            print(auth_response, end="")  # Afficher le texte d'authtification reçus pas le serveur
-            username = input()
-            secure_client.send(username.encode())  # Envoyez l'ID
-
-            print(secure_client.recv(1024).decode(), end="")
-            password = getpass.getpass()  # Faire que on voye pas le mdp qui est écrit pour la sécuriter
-            secure_client.send(password.encode())  # Envoyez le mdp
-
-            auth_response = secure_client.recv(1024).decode()  # Afficher la réponse du serveur
-            if auth_response == "AUTH_FAIL":
-                print("❌ Authentification échouée !")
+                input("Appuyez sur Entrée pour continuer...")
+                return # Retourne au menu
+            elif response != "MOT DE PASSE : ":
+                # Si on ne reçoit pas le prompt attendu, il y a un problème
+                # Cela peut arriver si le serveur envoie AUTH_FAIL pour une autre raison
+                # ou si le protocole est désynchronisé.
+                print(f"❌ Réponse inattendue du serveur après l'envoi de l'identifiant: {response}")
                 secure_client.close()
-                exit()
+                input("Appuyez sur Entrée pour continuer...")
+                return # Retourne au menu
+
+            # 4. Afficher le prompt reçu et demander le mot de passe
+            print(response, end="") # Affiche "MOT DE PASSE : "
+            password = getpass.getpass()
+            # 5. Envoyer le mot de passe
+            secure_client.send(password.encode())
+
+            # 6. Recevoir la réponse finale d'authentification
+            auth_response = secure_client.recv(1024).decode()
+            # --- MODIFICATION END ---
+
+            if auth_response == "AUTH_FAIL":
+                print("❌ Authentification échouée (Identifiant ou mot de passe incorrect)!")
             elif auth_response == "AUTH_SUCCESS":
                 print("✅ Authentification réussie ! Vous pouvez maintenant discuter.")
+                # Continuer vers le chat...
+                cle_utilisateur = getpass.getpass("🔑 Entrez votre clé de chiffrement : ")
+                threading.Thread(target=receive_messages, args=(secure_client, cle_utilisateur), daemon=True).start()
+                aff_menu(secure_client, username, cle_utilisateur)
+                # Si aff_menu se termine (déconnexion), la fonction login se termine aussi.
+                return # Retourne au menu après déconnexion normale
+            elif auth_response == "IP_LOCKED": # Peut aussi être reçu après échecs répétés
+                 print("❌ Trop de tentatives échouées. Votre IP est bloquée.")
             else:
-                print("❌ Erreur d'authentification.")
-                secure_client.close()
-                exit()
+                # Gérer d'autres réponses possibles (AUTH_TIMEOUT, etc.)
+                print(f"❌ Erreur d'authentification inattendue: {auth_response}")
+
+        except ssl.SSLError as e:
+             print(f"❌ Erreur SSL: {e}. Vérifiez les certificats ou la configuration SSL.")
+        except ConnectionResetError:
+             print("❌ La connexion a été réinitialisée par le serveur pendant l'authentification.")
         except Exception as e:
-            print(f"❌ Erreur d'authentification : {e}")
-            secure_client.close()
-            exit()
+            print(f"❌ Erreur pendant l'authentification : {e}")
+        finally:
+            # Assurer la fermeture propre du socket si ce n'est pas déjà fait
+            try:
+                if secure_client.fileno() != -1: # Vérifie si le socket est encore ouvert
+                    secure_client.close()
+            except Exception:
+                pass # Ignore les erreurs lors de la fermeture
 
-        # Demande de clé de chiffrement à l'utilisateur APRÈS l'authentification
-        cle_utilisateur = getpass.getpass("🔑 Entrez votre clé de chiffrement : ")  # Entrer le la clé de chiffrement
-
-        threading.Thread(target=receive_messages, args=(secure_client, cle_utilisateur), daemon=True).start()  # Lancer le thread des message reçu
-        aff_menu(secure_client, username, cle_utilisateur)  # Call aff_menu after login and pass secure_client, username and cle_utilisateur
-
+        # Si on arrive ici, c'est qu'il y a eu une erreur ou échec d'authentification
+        input("Appuyez sur Entrée pour continuer...")
+        return # Retourne au menu principal
 
 def aes_encrypt(texte, cle_utilisateur):
     try:

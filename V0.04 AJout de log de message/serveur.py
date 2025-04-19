@@ -123,54 +123,116 @@ async def create_account(reader, writer, ip_address):
         writer.write(b"AUTH_FAIL")
         await writer.drain()
 
-
 async def authenticate(reader, writer, ip_address):
-    """Gère l'authentification des utilisateurs."""
+    """Gère l'authentification et la création de compte."""
     current_time = time.time()
     try:
+        # --- Vérification du blocage IP (inchangée) ---
         if IP_LOCKOUT_UNTIL[ip_address] > current_time:
             logging.warning(f"Connexion refusée (IP bloquée) : {ip_address}")
             writer.write(b"IP_LOCKED")
             await writer.drain()
             return None
-    except:
-        print("Erreur lors du blocage d'une ip")
+    except Exception as e:
+        logging.error(f"Erreur lors de la vérification du blocage IP pour {ip_address}: {e}")
+        try:
+            if not writer.is_closing():
+                writer.write(b"AUTH_FAIL") # Ou un code d'erreur serveur interne
+                await writer.drain()
+        except Exception: pass
+        return None
 
     try:
-        writer.write(b"IDENTIFIANT : ")
-        await writer.drain()
-        username = (await asyncio.wait_for(reader.read(1024), timeout=AUTH_TIMEOUT)).decode().strip()
+        # --- MODIFICATION START ---
+        # 1. Lire la TOUTE PREMIERE chose envoyée par le client
+        #    Ce sera soit "CREATE_ACCOUNT", soit le nom d'utilisateur pour une connexion.
+        first_input_bytes = await asyncio.wait_for(reader.read(1024), timeout=AUTH_TIMEOUT)
+        first_input = first_input_bytes.decode().strip()
 
-        # Vérifier si c'est une demande de création de compte
-        if username == "CREATE_ACCOUNT":
+        # 2. Vérifier si c'est une demande de création de compte
+        if first_input == "CREATE_ACCOUNT":
+            # 3a. Si oui, appeler create_account qui lira username/password et enverra la réponse
+            #    PAS D'ENVOI DE PROMPT ICI.
+            logging.debug(f"Requête CREATE_ACCOUNT reçue de {ip_address}")
             await create_account(reader, writer, ip_address)
-            return None  # Ne pas continuer l'authentification si c'est une création de compte
+            # create_account gère l'envoi de ACCOUNT_CREATED/USERNAME_TAKEN/AUTH_FAIL
+            return None # La création de compte gère sa propre fin de communication
 
-        writer.write(b"MOT DE PASSE : ")
-        await writer.drain()
-        password = (await asyncio.wait_for(reader.read(1024), timeout=AUTH_TIMEOUT)).decode().strip()
+        # 3b. Si non, c'était une tentative de connexion, first_input est le username
+        else:
+            username = first_input
+            logging.debug(f"Tentative de connexion pour: {username} ({ip_address})")
 
-        if verify_user(username, password):
-            logging.info(f"Connexion réussie : {username} ({ip_address})")
-            writer.write(b"AUTH_SUCCESS")  # Explicit success message
+            # 4. Envoyer le prompt pour le mot de passe SEULEMENT MAINTENANT
+            writer.write(b"MOT DE PASSE : ")
             await writer.drain()
-            update_last_login(username)
-            return username
 
-        logging.warning(f"Échec de connexion : {username} ({ip_address})")
-        IP_FAILED_LOGIN_ATTEMPTS[ip_address] += 1
-        if IP_FAILED_LOGIN_ATTEMPTS[ip_address] >= MAX_FAILED_LOGIN_ATTEMPTS:
-            IP_LOCKOUT_UNTIL[ip_address] = current_time + IP_LOCKOUT_DURATION
-            logging.warning(f"IP bloquée : {ip_address} ({IP_LOCKOUT_DURATION}s)")
+            # 5. Lire le mot de passe
+            password = (await asyncio.wait_for(reader.read(1024), timeout=AUTH_TIMEOUT)).decode().strip()
+
+            # 6. Vérifier les identifiants (logique existante)
+            if verify_user(username, password):
+                IP_FAILED_LOGIN_ATTEMPTS[ip_address] = 0 # Reset on success
+                logging.info(f"Connexion réussie : {username} ({ip_address})")
+                writer.write(b"AUTH_SUCCESS")
+                await writer.drain()
+                update_last_login(username)
+                return username # Retourner le nom d'utilisateur pour handle_client
+            else: # verify_user returned False
+                logging.warning(f"Échec de connexion : {username} ({ip_address})")
+                IP_FAILED_LOGIN_ATTEMPTS[ip_address] += 1
+                if IP_FAILED_LOGIN_ATTEMPTS[ip_address] >= MAX_FAILED_LOGIN_ATTEMPTS:
+                    IP_LOCKOUT_UNTIL[ip_address] = current_time + IP_LOCKOUT_DURATION
+                    logging.warning(f"IP bloquée : {ip_address} ({IP_LOCKOUT_DURATION}s)")
+                    writer.write(b"IP_LOCKED")
+                    await writer.drain()
+                else:
+                    writer.write(b"AUTH_FAIL")
+                    await writer.drain()
+                return None # Échec de l'authentification
+        # --- MODIFICATION END ---
 
     except asyncio.TimeoutError:
-        logging.warning(f"Temps dépassé pour {ip_address}")
+        logging.warning(f"Temps dépassé pendant l'authentification/création de compte pour {ip_address}")
+        try:
+            if not writer.is_closing():
+                writer.write(b"AUTH_TIMEOUT") # Ou b"AUTH_FAIL"
+                await writer.drain()
+        except Exception: pass
+        return None
+    except ConnectionResetError:
+        logging.warning(f"Connexion réinitialisée par {ip_address} pendant l'authentification/création.")
+        return None
     except Exception as e:
-        logging.error(f"Erreur d'authentification : {e}")
+        logging.error(f"Erreur inattendue pendant l'authentification/création pour {ip_address}: {e}")
+        try:
+            if not writer.is_closing():
+                writer.write(b"AUTH_FAIL")
+                await writer.drain()
+        except Exception: pass
+        return None
 
-    writer.write(b"AUTH_FAIL")
-    await writer.drain()
-    return None
+
+    except asyncio.TimeoutError:
+        logging.warning(f"Temps dépassé pour l'authentification de {ip_address}")
+        try:
+            if not writer.is_closing():
+                # Envoyer AUTH_TIMEOUT si possible, sinon AUTH_FAIL pourrait être plus générique
+                writer.write(b"AUTH_TIMEOUT") # Ou b"AUTH_FAIL"
+                await writer.drain()
+        except Exception: pass
+        return None
+    except ConnectionResetError:
+        logging.warning(f"Connexion réinitialisée par {ip_address} pendant l'authentification.")
+        return None
+    except Exception as e:
+        logging.error(f"Erreur d'authentification inattendue pour {ip_address}: {e}")
+        try:
+            if not writer.is_closing():
+                writer.write(b"AUTH_FAIL")
+                await writer.drain()
+        except Exception: pass
+        return None
 
 
 # Vérifier les identifiants de l'utilisateur
